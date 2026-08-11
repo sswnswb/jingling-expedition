@@ -116,32 +116,40 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       bn.appendChild(h);
     }
 
-    // 商店：点卡片看详情，点金币按钮直接买（防误购）
+    // 商店：点卡片看详情，点金币按钮直接买（防误购）。买走一张少一张，不自动刷新。
     const sh = document.getElementById('shop')!;
     sh.innerHTML = `<div class="shop-title">商店 · 攒利息 <button class="btn btn--tiny" id="shop-help">❔ 装备/羁绊说明</button></div>`;
-    const row = document.createElement('div');
-    row.className = 'shop-row';
-    shop.forEach((id) => {
-      const spec = speciesById(id);
-      const can = run.gold >= spec.cost;
-      const c = document.createElement('div');
-      c.className = `shop-card${can ? '' : ' cant'}`;
-      c.innerHTML = `
-        <img class="shop-img" src="img/${id}.png" loading="lazy">
-        <div class="shop-name">${spec.name}</div>
-        <div class="shop-tags">${spec.tags.map((t) => `<span class="tag">${TYPE_CN[t] ?? t}</span>`).join('')}</div>
-        <div class="shop-skill">${spec.skill.name}</div>
-        <button class="btn btn--small ${can ? 'btn--gold' : ''}" data-buy ${can ? '' : 'disabled'}>🪙 ${spec.cost} 买</button>`;
-      c.addEventListener('click', () => showInspect(id));
-      c.querySelector<HTMLElement>('[data-buy]')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (buyUnit(run, id, ctx.rng) === null) { sfx.buy(); shop = rollShop(run, ctx.rng); render(); }
-        else sfx.sell();
+    if (shop.length === 0) {
+      sh.innerHTML += `<div class="shop-empty">商店已空 · 点「刷新」或打赢下一关免费换新货</div>`;
+    } else {
+      const row = document.createElement('div');
+      row.className = 'shop-row';
+      shop.forEach((id) => {
+        const spec = speciesById(id);
+        const can = run.gold >= spec.cost;
+        const c = document.createElement('div');
+        c.className = `shop-card${can ? '' : ' cant'}`;
+        c.innerHTML = `
+          <img class="shop-img" src="img/${id}.png" loading="lazy">
+          <div class="shop-name">${spec.name}</div>
+          <div class="shop-tags">${spec.tags.map((t) => `<span class="tag">${TYPE_CN[t] ?? t}</span>`).join('')}</div>
+          <div class="shop-skill">${spec.skill.name}</div>
+          <button class="btn btn--small ${can ? 'btn--gold' : ''}" data-buy ${can ? '' : 'disabled'}>🪙 ${spec.cost} 买</button>`;
+        c.addEventListener('click', () => showInspect(id));
+        c.querySelector<HTMLElement>('[data-buy]')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (buyUnit(run, id, ctx.rng) === null) {
+            sfx.buy();
+            const idx = shop.lastIndexOf(id);
+            if (idx >= 0) shop.splice(idx, 1); // 买走这张，剩下的保留
+            render();
+          } else sfx.sell();
+        });
+        row.appendChild(c);
       });
-      row.appendChild(c);
-    });
-    sh.appendChild(row);
-    sh.querySelector('#shop-help')?.addEventListener('click', () => showHelp());
+      sh.appendChild(row);
+      sh.querySelector('#shop-help')?.addEventListener('click', () => showHelp());
+    }
 
     // 选中单位详情
     const sel = document.getElementById('selected')!;
@@ -181,7 +189,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
 
     document.getElementById('p-level')?.addEventListener('click', () => { if (buyLevel(run)) { sfx.levelup(); render(); } });
     document.getElementById('p-reroll')?.addEventListener('click', () => {
-      if (run.gold >= shopRerollCost(run)) { run.gold -= shopRerollCost(run); shop = rollShop(run, ctx.rng); sfx.reroll(); render(); }
+      if (run.gold >= shopRerollCost(run)) { run.gold -= shopRerollCost(run); shop = rollShop(run, ctx.rng); ctx.offers = shop; sfx.reroll(); render(); }
     });
     document.getElementById('p-fight')?.addEventListener('click', () => {
       if (boardUnits(run).length === 0) { ctx.pendingMsg = ['至少上阵一只精灵才能出战！']; render(); return; }
@@ -229,7 +237,13 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
     m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
     m.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', closeModal));
     m.querySelector('[data-buy]')?.addEventListener('click', () => {
-      if (buyUnit(run, id, ctx.rng) === null) { sfx.buy(); shop = rollShop(run, ctx.rng); closeModal(); render(); }
+      if (buyUnit(run, id, ctx.rng) === null) {
+        sfx.buy();
+        const idx = shop.lastIndexOf(id);
+        if (idx >= 0) shop.splice(idx, 1);
+        closeModal();
+        render();
+      }
     });
     app.appendChild(m);
     modal = m;
