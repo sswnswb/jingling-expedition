@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "validate": "node scripts/validate.mjs",
     "fetch-art": "node scripts/fetch_art.mjs",
-    "deploy": "npm run build && gh-pages -d dist"
+    "deploy": "npm run build && gh-pages -d dist",
+    "test-engine": "node scripts/test_engine.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
