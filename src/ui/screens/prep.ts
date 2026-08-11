@@ -9,7 +9,7 @@ import { speciesById } from '../../data/species';
 import { itemById, ITEMS } from '../../data/items';
 import { genEnemyTeam, isBossStage, chapterOf, TOTAL_STAGES, enemyPower } from '../../data/campaign';
 import { TYPE_CN, describeSkill, type SpeciesDef } from '../../engine/rules';
-import { nextEvolve, synergyEffect } from '../../engine/run';
+import { nextEvolve, synergyEffect, synergyLine } from '../../engine/run';
 import { sfx } from '../sfx';
 import { battleScreen } from './battle';
 
@@ -267,6 +267,15 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
   function showInspect(id: string) {
     const spec = speciesById(id);
     const evo = nextEvolve(id);
+    // 场上羁绊计数（与上阵精灵一致）
+    const counts = new Map<string, number>();
+    for (const bu of boardUnits(run)) for (const t of speciesById(bu.speciesId).tags) counts.set(t, (counts.get(t) ?? 0) + 1);
+    const synRows = spec.tags.map((t) => {
+      const c = counts.get(t) ?? 0;
+      const l = synergyLine(t, c);
+      const state = l.tier > 0 ? `<span class="inspect-ok">✓ ${l.tier}档 ${l.effect}</span>` : `已有 ${c} 人 · 还差 ${l.thresholds[0] - c} 人`;
+      return `· ${l.cn}（凑 ${l.thresholds.join('/')}）${state}`;
+    }).join('<br>');
     closeModal();
     const m = document.createElement('div');
     m.className = 'modal-layer';
@@ -279,6 +288,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         <div class="inspect-stats">生命${spec.hp} · 攻击${spec.atk} · 特攻${spec.spa} · 防御${spec.def} · 速度${spec.spe}</div>
         <div class="inspect-row"><b>技能</b> ${spec.skill.name}：${describeSkill(spec.skill)}</div>
         <div class="inspect-row"><b>进化</b>${evo ? `：${evo}` : '：已是最终形态'}</div>
+        <div class="inspect-row"><b>可成羁绊</b><br>${synRows}</div>
         <div class="inspect-buy">
           <button class="btn btn--gold" data-buy>🪙 ${spec.cost} 购买</button>
           <button class="btn" data-x>关闭</button>

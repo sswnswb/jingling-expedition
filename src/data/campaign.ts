@@ -57,16 +57,23 @@ export function genEnemyTeam(rng: Rng, stage: number, isBoss = false): BUnit[] {
   }
   const themed = SPECIES.filter((s) => s.tags.includes(theme));
 
+  // 星级与费用随关卡解锁：前期绝不出现高星（★3 最早 12 关）、传说级（5金最早 17 关）
+  const maxStar = stage <= 5 ? 1 : stage <= 11 ? 2 : 3;
+  const maxCost = stage <= 2 ? 1 : stage <= 6 ? 2 : stage <= 11 ? 3 : stage <= 16 ? 4 : 5;
+
   const teamSize = isBoss ? Math.min(6, 3 + Math.floor(stage / 5)) : Math.min(6, 1 + Math.floor(stage / 4));
-  const p3 = Math.min(0.55, Math.max(0, (stage - 13) / 15));
-  const p2 = Math.min(0.6, Math.max(0, (stage - 6) / 13));
+  const p3 = Math.min(0.45, Math.max(0, (stage - 13) / 15));
+  const p2 = Math.min(0.55, Math.max(0, (stage - 6) / 13));
 
   const units: BUnit[] = [];
   for (let i = 0; i < teamSize; i++) {
     const roll = rng.next();
-    const wantStar = roll < p3 ? 3 : roll < p3 + p2 ? 2 : 1;
-    let pool = themed.filter((s) => s.star === wantStar);
-    if (pool.length === 0) pool = themed.filter((s) => s.star >= wantStar);
+    const wantStar = Math.min(maxStar, roll < p3 ? 3 : roll < p3 + p2 ? 2 : 1);
+    // 星级是硬上限；费用先按关卡限制，主题缺低费时才放宽（但星级绝不放宽到上限之上）
+    let pool = themed.filter((s) => s.cost <= maxCost && s.star === wantStar);
+    if (pool.length === 0) pool = themed.filter((s) => s.cost <= maxCost + 1 && s.star === wantStar);
+    if (pool.length === 0) pool = themed.filter((s) => s.star === wantStar);
+    if (pool.length === 0) pool = themed.filter((s) => s.star <= maxStar);
     if (pool.length === 0) pool = themed;
     const spec = rng.pick(pool);
     const sm = starMult(spec.star);

@@ -39,9 +39,11 @@ console.log('== 跑局引擎 ==');
   check('金币够升 1 级', buyLevel(run), `gold=${run.gold}, level=${run.level}`);
   // 商店
   const offers = rollShop(run, rng);
-  check('商店 3 个商品', offers.length === 3);
+  check('商店 4 个商品', offers.length === 4);
   for (const o of offers) check(`商品存在 ${o}`, SPECIES.some((s) => s.id === o));
 }
+
+const specCost = (id: string) => speciesById(id).cost;
 
 console.log('== 敌人生成 ==');
 {
@@ -52,6 +54,13 @@ console.log('== 敌人生成 ==');
     for (const u of team) {
       check(`敌方单位数据完整 ${u.name}`, u.hp > 0 && u.skill && u.skill.name !== '', `${u.name} hp=${u.hp}`);
     }
+  }
+  // 关卡门槛：早期绝无高星/传说，星级是硬上限
+  for (let st = 1; st <= 20; st++) {
+    const team = genEnemyTeam(createRng(7000 + st), st, false);
+    if (st <= 5) check(`第${st}关无 2星以上`, team.every((u) => u.star === 1), team.map((u) => u.star).join(','));
+    if (st <= 11) check(`第${st}关无 3星`, team.every((u) => u.star <= 2), team.map((u) => u.star).join(','));
+    if (st <= 16) check(`第${st}关无 5金传说`, team.every((u) => specCost(u.speciesId) <= 4), team.map((u) => `${u.name}=${specCost(u.speciesId)}`).join(','));
   }
 }
 

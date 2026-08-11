@@ -101,7 +101,7 @@ export function rollShop(_run: RunState, rng: Rng): string[] {
   let pool = SPECIES.filter((s) => s.star === 1 && !lineHas3(_run, s));
   if (pool.length === 0) pool = SPECIES.filter((s) => s.star === 1); // 兜底：全部满级也不至于空池
   const offers: string[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const cost = 1 + rng.weighted([0, 1, 2, 3, 4], COST_WEIGHTS);
     const tier = pool.filter((s) => s.cost === cost);
     offers.push(tier.length ? rng.pick(tier).id : rng.pick(pool).id);
@@ -196,13 +196,13 @@ export function buyLevel(run: RunState): boolean {
   return true;
 }
 
-export function shopRerollCost(_run: RunState): number { return 2; }
+export function shopRerollCost(_run: RunState): number { return 1; }
 
 /** 关卡结算：加钱（利息/连胜连败/喵喵财团），处理队伍血量 */
 export function settleStage(run: RunState, won: boolean, board: BoardUnit[]): string[] {
   const msg: string[] = [];
-  const interest = Math.min(5, Math.floor(run.gold / 10));
-  const base = won ? 6 : 3;
+  const interest = Math.min(6, Math.floor(run.gold / 8));
+  const base = won ? 8 : 5;
   run.gold += base + interest;
   msg.push(`${won ? '胜' : '败'} ${base}金 + 利息 ${interest}金`);
 
@@ -274,6 +274,21 @@ const SYNERGY_TEXT: Record<string, (tier: number) => string> = {
 
 export function synergyEffect(tag: string, tier: number): string {
   return SYNERGY_TEXT[tag]?.(tier) ?? '';
+}
+
+/** 单个标签的羁绊信息（供详情展示"这只精灵能成什么羁绊"） */
+export function synergyLine(tag: string, count: number): { cn: string; thresholds: number[]; tier: number; effect: string } {
+  if (TYPE_CN[tag]) {
+    const thresholds = tag === 'bug' || tag === 'ice' || tag === 'psychic' || tag === 'poison' ? [2, 4] : [2, 4, 6];
+    const tier = traitTier(count, thresholds);
+    return { cn: `${TYPE_CN[tag]}系`, thresholds, tier, effect: synergyEffect(tag, tier) };
+  }
+  if (FUN_TAGS.has(tag)) {
+    const thresholds = tag === 'legend' ? [2, 3] : tag === 'starter' ? [2, 3, 4] : [1, 2];
+    const tier = traitTier(count, thresholds);
+    return { cn: FUN_CN[tag], thresholds, tier, effect: synergyEffect(tag, tier) };
+  }
+  return { cn: tag, thresholds: [], tier: 0, effect: '' };
 }
 
 export function computeSynergies(_run: RunState, board: BoardUnit[]): SynergyInfo[] {
