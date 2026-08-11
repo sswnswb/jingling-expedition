@@ -24,7 +24,7 @@ export const menuScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         <div>🪙 攒利息 · 🧬 三只合成进化 · ⭐ 凑羁绊</div>
         <div>🔮 装上进化钥石，满能量 Mega 进化</div>
       </div>
-      <div class="title-ver">v0.2</div>
+      <div class="title-ver">v0.3</div>
     </div>
   `;
 
