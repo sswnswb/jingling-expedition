@@ -123,5 +123,6 @@ var et=Object.defineProperty;var tt=(e,t,a)=>t in e?et(e,t,{enumerable:!0,config
         <div>🪙 攒利息 · 🧬 三只合成进化 · ⭐ 凑羁绊</div>
         <div>🔮 装上进化钥石，满能量 Mega 进化</div>
       </div>
+      <div class="title-ver">v0.2</div>
     </div>
   `,(n=e.querySelector("#btn-start"))==null||n.addEventListener("click",()=>{var d;const r=(((d=e.querySelector("#inp-name"))==null?void 0:d.value)??"").trim();t.name=r||"无名训练师";try{localStorage.setItem(He,r)}catch{}t.run=kt(t.seed,t.name),t.offers=xe(t.run,t.rng),t.enemy=[],t.pendingItems=[],t.pendingMsg=[],t.lastEnemyPower=0,A.click(),a.show(Ye)})},Xe=document.getElementById("app");if(!Xe)throw new Error("#app not found");const Re=it(),zt={seed:Re,rng:at(Re),name:"",run:null,offers:[],enemy:[],lastEnemyPower:0,pendingItems:[],pendingMsg:[]},Ke=new st(Xe,zt);window.addEventListener("pointerdown",()=>A.unlock(),{once:!0});const he=document.getElementById("rotate-hint"),Oe=document.getElementById("rotate-x");if(he&&Oe){Oe.addEventListener("click",()=>{try{localStorage.setItem("nmt_rotate_off","1")}catch{}he.style.display="none"});try{localStorage.getItem("nmt_rotate_off")&&(he.style.display="none")}catch{}}window.router=Ke;gt(()=>Ke.show(De));
