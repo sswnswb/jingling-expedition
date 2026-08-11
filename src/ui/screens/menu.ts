@@ -35,6 +35,7 @@ export const menuScreen: ScreenMount = (app, ctx: GameCtx, router) => {
     ctx.run = createRun(ctx.seed, ctx.name);
     ctx.offers = rollShop(ctx.run, ctx.rng);
     ctx.enemy = [];
+    ctx.enemyStage = 0;
     ctx.pendingItems = [];
     ctx.pendingMsg = [];
     ctx.lastEnemyPower = 0;

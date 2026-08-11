@@ -87,10 +87,14 @@ export const battleScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         const from = slotPos(side, ev.from, W, H);
         const to = slotPos(opp, ev.to, W, H);
         if (ev.dmg > 0) {
-          fx.push({ kind: 'proj', x0: from.x, y0: from.y, x1: to.x, y1: to.y, t0: now, dur: 0.28, color: elemColor(ev.elem), big: ev.crit });
-          fx.push({ kind: 'num', x: to.x, y: to.y - 40, t0: now + 0.2, dur: 0.7, text: `-${ev.dmg}`, color: ev.crit ? '#ffd25e' : '#fff', big: ev.crit });
+          const ke = ev.adv > 1.1;
+          const res = ev.adv < 0.9;
+          const color = ke ? '#ffd25e' : res ? '#9aa4b5' : '#fff';
+          const label = `${ke ? '克制 ' : res ? '抵抗 ' : ''}-${ev.dmg}`;
+          fx.push({ kind: 'proj', x0: from.x, y0: from.y, x1: to.x, y1: to.y, t0: now, dur: 0.28, color: elemColor(ev.elem), big: ev.crit || ke });
+          fx.push({ kind: 'num', x: to.x, y: to.y - 40, t0: now + 0.2, dur: 0.7, text: label, color, big: ev.crit || ke });
           fx.push({ kind: 'cellflash', x: to.x, y: to.y, t0: now + 0.2, dur: 0.16, w: to.w, h: to.h });
-          if (ev.crit) sfx.crit(); else sfx.hit();
+          if (ke) sfx.crit(); else if (ev.crit) sfx.crit(); else sfx.hit();
         }
         break;
       }

@@ -16,6 +16,7 @@ const ctx: GameCtx = {
   run: null as never,
   offers: [],
   enemy: [],
+  enemyStage: 0,
   lastEnemyPower: 0,
   pendingItems: [],
   pendingMsg: [],

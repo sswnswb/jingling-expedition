@@ -9,6 +9,8 @@ export interface GameCtx {
   run: RunState;
   offers: string[];
   enemy: BUnit[];
+  /** 当前敌方对应的关卡号（用于缓存：同一关不重复生成） */
+  enemyStage: number;
   /** 上一场战斗的敌方（结算面板用） */
   lastEnemyPower: number;
   /** 待领取的战利品（击杀/宝箱掉的装备） */

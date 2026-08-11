@@ -51,27 +51,35 @@ try {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(QA, '02-prep.png') });
 
+  // 敌方预览面板应存在（下一关阵容 + 战力）
+  if (!(await page.$('.prep__enemy .enemy-grid'))) throw new Error('缺少敌方预览面板 .prep__enemy');
+  if (!(await page.$('.prep__enemy .enemy-power'))) throw new Error('缺少敌方战力数值');
+
   // 买 2 张卡（点卡上的购买按钮；点卡本身是看详情）
   const buy = page.locator('.shop-card [data-buy]');
   for (let i = 0; i < 2; i++) { await buy.nth(0).click(); await page.waitForTimeout(120); }
 
-  // 上阵：点备战席第一只 → 点棋盘第 1 格
+  // 选中备战席第一只 → 截装备自选面板（装备选择区应出现）
   const bench = await page.$('.bench-slot');
-  if (bench) { await bench.click(); await page.waitForTimeout(100); }
+  if (bench) { await bench.click(); await page.waitForTimeout(150); }
+  if (!(await page.$('.sel-equip-row'))) throw new Error('选中单位时缺少装备选择区 .sel-equip-row');
+  await page.screenshot({ path: path.join(QA, '03-prep-selected.png') });
+
+  // 上阵：点棋盘第 1 格
   await page.locator('.slot').nth(0).click();
   await page.waitForTimeout(150);
-  await page.screenshot({ path: path.join(QA, '03-prep-board.png') });
+  await page.screenshot({ path: path.join(QA, '04-prep-board.png') });
 
   // 出战
   await page.click('#p-fight');
   await page.waitForSelector('.battle', { timeout: 10000 });
   await page.waitForTimeout(2500);
-  await page.screenshot({ path: path.join(QA, '04-battle.png') });
+  await page.screenshot({ path: path.join(QA, '05-battle.png') });
 
   // 快进结束
   await page.click('#b-skip');
   await page.waitForSelector('#b-continue', { timeout: 15000 });
-  await page.screenshot({ path: path.join(QA, '05-result.png') });
+  await page.screenshot({ path: path.join(QA, '06-result.png') });
   await page.click('#b-continue');
   await page.waitForSelector('.prep', { timeout: 10000 });
 

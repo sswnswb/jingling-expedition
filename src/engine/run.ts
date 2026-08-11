@@ -50,7 +50,7 @@ export interface RunState {
 export const TOTAL_STAGES = 25;
 export const MAX_LEVEL = 6;
 export const MAX_UNITS = 12;
-const LEVEL_COST = [0, 5, 9, 15, 22, 32]; // 升到下一级的花费（下标=当前级）
+const LEVEL_COST = [0, 4, 8, 14, 22, 32]; // 升到下一级的花费（下标=当前级）
 const TYPE_CN: Record<string, string> = {
   fire: '火', water: '水', grass: '草', electric: '电', normal: '一般', flying: '飞行',
   fighting: '格斗', ghost: '幽灵', dragon: '龙', ground: '地面', rock: '岩石',
@@ -59,7 +59,7 @@ const TYPE_CN: Record<string, string> = {
 
 export function createRun(seed: number, name: string): RunState {
   return {
-    seed, name: name || '无名修士', stage: 1, chapter: 1, gold: 8, level: 1, hp: 100,
+    seed, name: name || '无名修士', stage: 1, chapter: 1, gold: 12, level: 1, hp: 100,
     units: [], streak: 0, dragonStacks: 0, clearedStages: 0, items: [], wins: 0, kills: 0,
     over: false, result: null,
   };
@@ -76,8 +76,30 @@ export function benchUnits(run: RunState): BoardUnit[] {
 
 const COST_WEIGHTS = [50, 30, 13, 5, 2]; // cost 1-5 档出现权重
 
+/** 一族进化链上的全部精灵 id（含随机进化分支） */
+function familyIds(spec: SpeciesDef): Set<string> {
+  const out = new Set([spec.id]);
+  const queue = [spec.id];
+  let guard = 0;
+  while (queue.length && guard++ < 40) {
+    const cur = speciesById(queue.shift()!);
+    if (!cur) continue;
+    if (cur.evolvesInto && !out.has(cur.evolvesInto)) { out.add(cur.evolvesInto); queue.push(cur.evolvesInto); }
+    for (const eid of cur.evolvesRandom ?? []) if (!out.has(eid)) { out.add(eid); queue.push(eid); }
+  }
+  return out;
+}
+
+/** 进化线是否已有一只三星（满级）——已满级的线从商店剔除，不再重复刷出 */
+function lineHas3(run: RunState, spec: SpeciesDef): boolean {
+  const threes = new Set(run.units.filter((u) => u.star === 3).map((u) => u.speciesId));
+  for (const id of familyIds(spec)) if (threes.has(id)) return true;
+  return false;
+}
+
 export function rollShop(_run: RunState, rng: Rng): string[] {
-  const pool = SPECIES.filter((s) => s.star === 1);
+  let pool = SPECIES.filter((s) => s.star === 1 && !lineHas3(_run, s));
+  if (pool.length === 0) pool = SPECIES.filter((s) => s.star === 1); // 兜底：全部满级也不至于空池
   const offers: string[] = [];
   for (let i = 0; i < 3; i++) {
     const cost = 1 + rng.weighted([0, 1, 2, 3, 4], COST_WEIGHTS);

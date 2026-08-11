@@ -16,11 +16,11 @@ export interface ChapterDef {
 }
 
 export const CHAPTERS: ChapterDef[] = [
-  { title: '第一章 · 初入森林', boss: '草丛霸主', scale: 0.9, theme: 'grass' },
-  { title: '第二章 · 溪谷试炼', boss: '水系馆主', scale: 1.12, theme: 'water' },
-  { title: '第三章 · 幽暗洞窟', boss: '幽灵馆主', scale: 1.36, theme: 'ghost' },
-  { title: '第四章 · 龙之裂谷', boss: '龙之长老', scale: 1.62, theme: 'dragon' },
-  { title: '第五章 · 冠军之路', boss: '精灵冠军', scale: 1.9, theme: 'legend' },
+  { title: '第一章 · 初入森林', boss: '草丛霸主', scale: 0.8, theme: 'grass' },
+  { title: '第二章 · 溪谷试炼', boss: '水系馆主', scale: 0.95, theme: 'water' },
+  { title: '第三章 · 幽暗洞窟', boss: '幽灵馆主', scale: 1.12, theme: 'ghost' },
+  { title: '第四章 · 龙之裂谷', boss: '龙之长老', scale: 1.3, theme: 'dragon' },
+  { title: '第五章 · 冠军之路', boss: '精灵冠军', scale: 1.5, theme: 'legend' },
 ];
 
 export const CHAPTERS_TOTAL = CHAPTERS.length;
@@ -46,7 +46,7 @@ function resolveSkill(spec: { skill: SkillDef }): SkillDef {
 /** 生成敌方队伍（返回可直接开打的 BUnit[]） */
 export function genEnemyTeam(rng: Rng, stage: number, isBoss = false): BUnit[] {
   const ch = chapterOf(stage);
-  const scale = ch.scale * (1 + stage * 0.02);
+  const scale = ch.scale * (1 + stage * 0.015);
 
   // 主题
   let theme: string;
@@ -57,9 +57,9 @@ export function genEnemyTeam(rng: Rng, stage: number, isBoss = false): BUnit[] {
   }
   const themed = SPECIES.filter((s) => s.tags.includes(theme));
 
-  const teamSize = isBoss ? Math.min(6, 3 + Math.floor(stage / 4)) : Math.min(6, 1 + Math.floor(stage / 3));
-  const p3 = Math.min(0.55, Math.max(0, (stage - 10) / 14));
-  const p2 = Math.min(0.6, Math.max(0, (stage - 4) / 12));
+  const teamSize = isBoss ? Math.min(6, 3 + Math.floor(stage / 5)) : Math.min(6, 1 + Math.floor(stage / 4));
+  const p3 = Math.min(0.55, Math.max(0, (stage - 13) / 15));
+  const p2 = Math.min(0.6, Math.max(0, (stage - 6) / 13));
 
   const units: BUnit[] = [];
   for (let i = 0; i < teamSize; i++) {
@@ -75,7 +75,7 @@ export function genEnemyTeam(rng: Rng, stage: number, isBoss = false): BUnit[] {
     let spa = spec.spa * sm * scale;
     let def = spec.def * sm * scale;
     let spe = spec.spe * sm * scale;
-    if (isBoss) { hp *= 1.35; atk *= 1.15; spa *= 1.15; }
+    if (isBoss) { hp *= 1.25; atk *= 1.1; spa *= 1.1; }
     hp = Math.round(hp); atk = Math.round(atk); spa = Math.round(spa); def = Math.round(def); spe = Math.round(spe);
 
     units.push({

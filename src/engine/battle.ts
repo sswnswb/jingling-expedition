@@ -9,7 +9,7 @@ import type { Rng } from './rng';
 import { typeAdv, attackInterval, type SkillDef } from './rules';
 
 export type SimEvent =
-  | { type: 'attack'; side: 'ally' | 'enemy'; from: number; to: number; dmg: number; crit: boolean; elem: string }
+  | { type: 'attack'; side: 'ally' | 'enemy'; from: number; to: number; dmg: number; crit: boolean; elem: string; adv: number }
   | { type: 'cast'; side: 'ally' | 'enemy'; from: number; elem: string; shape: string; dmg: number; heal: number; shield: number; cc: string; target: number }
   | { type: 'damage'; side: 'ally' | 'enemy'; slot: number; amount: number }
   | { type: 'heal'; side: 'ally' | 'enemy'; slot: number; amount: number }
@@ -77,9 +77,15 @@ export function startBattle(ally: BUnit[], enemy: BUnit[], rng: Rng): BattleStat
 
 function alive(side: BUnit[]): BUnit[] { return side.filter((u) => u.hp > 0); }
 
-function targetOf(opp: BUnit[]): BUnit | null {
-  const t = alive(opp).sort((a, b) => a.slot - b.slot);
-  return t[0] ?? null;
+/** 瞄准：优先前排；同排内优先同列（按列对线），再按左到右。不再死盯固定一格。 */
+function targetOf(opp: BUnit[], attackerSlot: number): BUnit | null {
+  const av = alive(opp);
+  if (av.length === 0) return null;
+  const front = av.filter((u) => u.slot < 3);
+  const pool = front.length > 0 ? front : av;
+  const acol = attackerSlot % 3;
+  pool.sort((a, b) => (Math.abs((a.slot % 3) - acol) - Math.abs((b.slot % 3) - acol)) || a.slot - b.slot);
+  return pool[0];
 }
 
 function otherSide(b: BattleState, side: 'ally' | 'enemy'): BUnit[] { return side === 'ally' ? b.enemy : b.ally; }
@@ -101,7 +107,7 @@ function hit(b: BattleState, side: 'ally' | 'enemy', source: BUnit | null, targe
   out -= shieldAbs;
   out = Math.max(0, out);
   target.hp -= out;
-  b.events.push({ type: 'attack', side, from: source ? source.slot : -1, to: target.slot, dmg: out, crit, elem });
+  b.events.push({ type: 'attack', side, from: source ? source.slot : -1, to: target.slot, dmg: out, crit, elem, adv });
   if (source && source.lifesteal > 0 && out > 0) {
     const h = Math.round(out * source.lifesteal);
     source.hp = Math.min(source.maxhp, source.hp + h);
@@ -144,7 +150,7 @@ function castSkill(b: BattleState, side: 'ally' | 'enemy', u: BUnit, ghost: numb
 
   switch (s.t) {
     case 'single': {
-      const t = targetOf(opp);
+      const t = targetOf(opp, u.slot);
       if (t) { targetSlot = t.slot; hit(b, side, u, t, dmgBase, s.e, ghost, b.rng.chance(u.crit)); }
       break;
     }
@@ -171,7 +177,7 @@ function castSkill(b: BattleState, side: 'ally' | 'enemy', u: BUnit, ghost: numb
   }
   // 控制（有 cc 属性时额外附加）
   if (s.cc) {
-    const t = targetOf(opp);
+    const t = targetOf(opp, u.slot);
     if (t && b.rng.chance(Math.min(1, 0.35 + u.ccBonus))) {
       cc = s.cc; t.cc = s.cc; t.ccTimer = 2.2;
       b.events.push({ type: 'cc', side, slot: t.slot, kind: s.cc });
@@ -197,7 +203,7 @@ export function stepSim(b: BattleState, allyGhost: number, enemyGhost: number): 
       }
       u.energy += u.energyGain * DT;
       u.atkTimer -= DT;
-      const target = targetOf(opp);
+      const target = targetOf(opp, u.slot);
       if (target && u.atkTimer <= 0) {
         u.atkTimer = attackInterval(u.spe);
         const crit = b.rng.chance(u.crit);

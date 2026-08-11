@@ -7,8 +7,8 @@ import {
 } from '../../engine/run';
 import { speciesById } from '../../data/species';
 import { itemById, ITEMS } from '../../data/items';
-import { genEnemyTeam, isBossStage, chapterOf, TOTAL_STAGES } from '../../data/campaign';
-import { TYPE_CN, describeSkill } from '../../engine/rules';
+import { genEnemyTeam, isBossStage, chapterOf, TOTAL_STAGES, enemyPower } from '../../data/campaign';
+import { TYPE_CN, describeSkill, type SpeciesDef } from '../../engine/rules';
 import { nextEvolve, synergyEffect } from '../../engine/run';
 import { sfx } from '../sfx';
 import { battleScreen } from './battle';
@@ -60,6 +60,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       <div class="prep__boardwrap">
         <div class="prep__board" id="board"></div>
         <div class="prep__bench" id="bench"></div>
+        <div class="prep__enemy" id="enemy"></div>
       </div>
 
       <div class="prep__shop" id="shop"></div>
@@ -116,6 +117,28 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       bn.appendChild(h);
     }
 
+    // 下一关敌方预览：进关首帧生成一次并缓存，排兵布阵参考。
+    if (ctx.enemyStage !== run.stage || ctx.enemy.length === 0) {
+      ctx.enemy = genEnemyTeam(ctx.rng, run.stage, isBossStage(run.stage));
+      ctx.enemyStage = run.stage;
+    }
+    {
+      const ep = document.getElementById('enemy')!;
+      const boss = isBossStage(run.stage);
+      const pwr = enemyPower(ctx.enemy);
+      ep.innerHTML = `
+        <div class="enemy-title">下一关 · 敌方阵容${boss ? ' <span class="boss-tag">BOSS</span>' : ''}</div>
+        <div class="enemy-power">战力 ≈ ${pwr}</div>
+        <div class="enemy-grid">${ctx.enemy.map((u) => `
+          <div class="enemy-unit">
+            <img class="enemy-img" src="img/${u.speciesId}.png" loading="lazy">
+            <div class="enemy-stars">${'★'.repeat(u.star)}</div>
+            <div class="enemy-name">${u.name}</div>
+          </div>`).join('')}
+        </div>
+        <div class="enemy-hint">敌人按列对线 · 前排扛伤，后排输出</div>`;
+    }
+
     // 商店：点卡片看详情，点金币按钮直接买（防误购）。买走一张少一张，不自动刷新。
     const sh = document.getElementById('shop')!;
     sh.innerHTML = `<div class="shop-title">商店 · 攒利息 <button class="btn btn--tiny" id="shop-help">❔ 装备/羁绊说明</button></div>`;
@@ -151,7 +174,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       sh.querySelector('#shop-help')?.addEventListener('click', () => showHelp());
     }
 
-    // 选中单位详情
+    // 选中单位详情（含装备自选 + 推荐）
     const sel = document.getElementById('selected')!;
     if (selectedUid) {
       const u = run.units.find((x) => x.uid === selectedUid);
@@ -161,29 +184,40 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         const stat = rb.units.find((x) => x.uid === u.uid);
         const item = u.item ? itemById(u.item) : null;
         const activeSyn = resolved.synergies.filter((s) => spec.tags.includes(s.tag)).map((s) => s.cn).join('、');
+        const rec = recommendItem(spec);
         sel.innerHTML = `
           <div class="sel-card">
             <img class="sel-img" src="img/${u.speciesId}.png">
             <div class="sel-info">
               <div class="sel-name">${spec.name} <span class="stars">${'★'.repeat(u.star)}${'☆'.repeat(3 - u.star)}</span></div>
               <div class="sel-skill">技能：${spec.skill.name} — ${describeSkill(spec.skill)}</div>
-              <div class="sel-item">装备：${item ? `${item.name} — ${item.desc}` : '无'}</div>
               ${activeSyn ? `<div class="sel-syn">羁绊：${activeSyn}</div>` : ''}
               ${stat ? `<div class="sel-stats">生命${stat.maxhp} 攻${stat.atk} 特攻${stat.spa} 防${stat.def} 速${stat.spe}</div>` : ''}
             </div>
-            <div class="sel-actions">
-              ${u.item ? `<button class="btn btn--small" id="s-unequip">卸下</button>` : ''}
-              ${run.items.length && !u.item ? `<button class="btn btn--small" id="s-equip">装备(${run.items.length})</button>` : ''}
-              ${u.slot >= 0 ? `<button class="btn btn--small" id="s-bench">下阵</button>` : ''}
-              <button class="btn btn--small" id="s-sell">出售 +${spec.cost}</button>
-              <button class="btn btn--small" id="s-close">✕</button>
+            <div class="sel-side">
+              <div class="sel-equip">
+                <div class="sel-equip-title">装备${rec && item?.id !== rec ? `<span class="rec-tip">⭐ 推荐 ${itemById(rec)?.name}</span>` : ''}</div>
+                <div class="sel-equip-row">
+                  ${item ? `<button class="equip-chip equipped" data-eq-null>${item.icon} ${item.name} · 卸下</button>` : ''}
+                  ${run.items.map((it) => `<button class="equip-chip${it === rec ? ' rec' : ''}" data-eq="${it}">${itemById(it)?.icon ?? ''} ${itemById(it)?.name ?? it}</button>`).join('')}
+                  ${!item && run.items.length === 0 ? '<span class="equip-none">暂无装备 · 打关卡掉落</span>' : ''}
+                </div>
+              </div>
+              <div class="sel-actions">
+                ${u.slot >= 0 ? `<button class="btn btn--small" id="s-bench">下阵</button>` : ''}
+                <button class="btn btn--small" id="s-sell">出售 +${spec.cost}</button>
+                <button class="btn btn--small" id="s-close">✕</button>
+              </div>
             </div>
           </div>`;
         sel.querySelector('#s-sell')?.addEventListener('click', () => { sellUnit(run, u.uid); sfx.sell(); selectedUid = null; render(); });
         sel.querySelector('#s-bench')?.addEventListener('click', () => { placeUnit(run, u.uid, -1); sfx.click(); render(); });
-        sel.querySelector('#s-equip')?.addEventListener('click', () => { equipItem(run, u.uid, run.items[0]); sfx.equip(); render(); });
-        sel.querySelector('#s-unequip')?.addEventListener('click', () => { equipItem(run, u.uid, null); sfx.equip(); render(); });
         sel.querySelector('#s-close')?.addEventListener('click', () => { selectedUid = null; render(); });
+        sel.querySelector('[data-eq-null]')?.addEventListener('click', () => { equipItem(run, u.uid, null); sfx.equip(); render(); });
+        sel.querySelectorAll<HTMLElement>('[data-eq]').forEach((b) => b.addEventListener('click', () => {
+          if (item?.id === b.dataset.eq) return; // 已装备同一件
+          equipItem(run, u.uid, b.dataset.eq ?? null); sfx.equip(); render();
+        }));
       }
     }
 
@@ -193,7 +227,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
     });
     document.getElementById('p-fight')?.addEventListener('click', () => {
       if (boardUnits(run).length === 0) { ctx.pendingMsg = ['至少上阵一只精灵才能出战！']; render(); return; }
-      ctx.enemy = genEnemyTeam(ctx.rng, run.stage, isBossStage(run.stage));
+      // 敌方已在进入本关时生成并缓存（可预览），直接开打
       ctx.offers = shop;
       ctx.pendingMsg = [];
       router.show(battleScreen);
@@ -209,6 +243,22 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         ${u.item ? `<div class="unit-item">${itemById(u.item)?.icon ?? ''}</div>` : ''}
         <div class="unit-name">${spec.name}</div>
       </div>`;
+  }
+
+  /* ---------- 装备推荐 ---------- */
+  const PHYSICAL = new Set(['fighting', 'normal', 'ground', 'rock', 'bug']);
+  function recommendItem(spec: SpeciesDef): string {
+    const has = (id: string) => run.items.includes(id);
+    const power = spec.skill.power ?? (PHYSICAL.has(spec.skill.e) ? 'atk' : 'spa');
+    if (spec.mega && has('mega_stone')) return 'mega_stone';          // 能 Mega 优先钥石
+    if (spec.tags.includes('tank') && has('iron_shell')) return 'iron_shell'; // 坦克：开局盾
+    if (spec.tags.includes('tank') && has('guard_amulet')) return 'guard_amulet';
+    if (power === 'spa' && has('mystic_drop')) return 'mystic_drop';  // 特攻手
+    if (power === 'atk' && has('vampire_tooth')) return 'vampire_tooth'; // 物攻手：吸血站场
+    if (power === 'atk' && has('power_band')) return 'power_band';
+    if (has('dragon_teeth')) return 'dragon_teeth';                   // 通用万金油
+    if (has('swift_wings')) return 'swift_wings';
+    return '';
   }
 
   /* ---------- 详情弹窗 ---------- */
