@@ -47,9 +47,9 @@ let battles = 0;
 let outcome = 'running';
 
 async function playPrep() {
-  // 尽量买卡
+  // 尽量买卡（点卡上的购买按钮）
   for (let i = 0; i < 5; i++) {
-    const can = await page.$('.shop-card:not(.cant)');
+    const can = await page.$('.shop-card:not(.cant) [data-buy]');
     if (!can) break;
     try { await can.click(); } catch { break; }
     await page.waitForTimeout(50);

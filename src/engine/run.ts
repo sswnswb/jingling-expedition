@@ -24,6 +24,7 @@ export interface SynergyInfo {
   tier: number;
   thresholds: number[];
   desc: string;
+  effect: string; // 当前档位的实际效果文字
   isFun: boolean;
 }
 
@@ -225,6 +226,34 @@ const FUN_DESC: Record<string, string> = {
   tank: '坦克减伤', legend: '传说单位开场能量满',
 };
 
+/** 各羁绊每档的实际效果（与 resolveBoard 数值一一对应，是唯一真源） */
+const SYNERGY_TEXT: Record<string, (tier: number) => string> = {
+  fire: (t) => `全队攻击 +${[15, 35, 70][t - 1]}%`,
+  water: (t) => `全队吸血 ${[8, 18, 30][t - 1]}%`,
+  grass: (t) => `每3秒回血 ${[2, 4, 7][t - 1]}%`,
+  electric: (t) => `全队攻速 +${[18, 40, 80][t - 1]}%`,
+  normal: (t) => `全队生命 +${[10, 25, 45][t - 1]}%`,
+  flying: (t) => `闪避 ${[10, 22, 40][t - 1]}%`,
+  fighting: (t) => `暴击率 ${[15, 30, 55][t - 1]}%`,
+  ghost: (t) => `每损失1个队友，伤害 +${[6, 10, 16][t - 1]}%`,
+  dragon: (t) => `每通关一关，全属性 +${[1.5, 3, 5][t - 1]}%`,
+  ground: (t) => `防御 +${[25, 50, 90][t - 1]}%`,
+  rock: (t) => `开场护盾 ${[15, 30, 50][t - 1]}% 最大生命`,
+  bug: (t) => `生命 +${[8, 20][t - 1]}%`,
+  ice: (t) => `控制概率 +${[25, 60][t - 1]}%`,
+  psychic: (t) => `能量回复 +${[4, 10][t - 1]}/秒`,
+  poison: (t) => `普攻附加中毒 ${[1, 2][t - 1]}层`,
+  starter: (t) => `全队攻击 +${[8, 20, 35][t - 1]}%`,
+  money: (t) => `每关金币 +${[3, 6][t - 1]}（连败翻倍）`,
+  gamble: (t) => `伊布随机进化；伊布家族属性 +${[0, 12][t - 1]}%`,
+  tank: (t) => `坦克防御 +${[20, 40][t - 1]}%`,
+  legend: (t) => `传说开场满能量；全队属性 +${[0, 15, 35][t - 1]}%`,
+};
+
+export function synergyEffect(tag: string, tier: number): string {
+  return SYNERGY_TEXT[tag]?.(tier) ?? '';
+}
+
 export function computeSynergies(_run: RunState, board: BoardUnit[]): SynergyInfo[] {
   const counts = tagCounts(board);
   const out: SynergyInfo[] = [];
@@ -232,15 +261,18 @@ export function computeSynergies(_run: RunState, board: BoardUnit[]): SynergyInf
   for (const [tag, cn] of Object.entries(TYPE_CN)) {
     const c = counts.get(tag) ?? 0;
     const thresholds = tag === 'bug' || tag === 'ice' || tag === 'psychic' || tag === 'poison' ? [2, 4] : [2, 4, 6];
-    if (c > 0) out.push({ tag, cn, count: c, tier: traitTier(c, thresholds), thresholds, desc: `${cn}系羁绊`, isFun: false });
+    if (c > 0) out.push({ tag, cn, count: c, tier: traitTier(c, thresholds), thresholds, desc: `${cn}系羁绊`, effect: '', isFun: false });
   }
   // 娱乐
   for (const tag of FUN_TAGS) {
     const c = counts.get(tag) ?? 0;
     const thresholds = tag === 'legend' ? [2, 3] : tag === 'starter' ? [2, 3, 4] : [1, 2];
-    if (c > 0) out.push({ tag, cn: FUN_CN[tag], count: c, tier: traitTier(c, thresholds), thresholds, desc: FUN_DESC[tag], isFun: true });
+    if (c > 0) out.push({ tag, cn: FUN_CN[tag], count: c, tier: traitTier(c, thresholds), thresholds, desc: FUN_DESC[tag], effect: '', isFun: true });
   }
-  return out.filter((s) => s.tier > 0).sort((a, b) => b.tier - a.tier);
+  return out
+    .filter((s) => s.tier > 0)
+    .map((s) => ({ ...s, effect: synergyEffect(s.tag, s.tier) }))
+    .sort((a, b) => b.tier - a.tier);
 }
 
 /* ---------- 最终属性结算 → 战斗单位 ---------- */
@@ -335,7 +367,7 @@ export function resolveBoard(run: RunState, board: BoardUnit[]): ResolvedBoard {
 /** 总览：合成进化链是否可达 */
 export function nextEvolve(speciesId: string): string | null {
   const spec = speciesById(speciesId);
-  if (spec.evolvesInto) return spec.evolvesInto;
+  if (spec.evolvesInto) return speciesById(spec.evolvesInto).name;
   if (spec.evolvesRandom) return `随机：${spec.evolvesRandom.map((id) => speciesById(id).name).join('/')}`;
   return spec.star < 3 ? '同名升星' : null;
 }

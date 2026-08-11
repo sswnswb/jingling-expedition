@@ -6,9 +6,10 @@ import {
   benchUnits, resolveBoard, shopRerollCost, MAX_LEVEL, type BoardUnit,
 } from '../../engine/run';
 import { speciesById } from '../../data/species';
-import { itemById } from '../../data/items';
+import { itemById, ITEMS } from '../../data/items';
 import { genEnemyTeam, isBossStage, chapterOf, TOTAL_STAGES } from '../../data/campaign';
-import { TYPE_CN } from '../../engine/rules';
+import { TYPE_CN, describeSkill } from '../../engine/rules';
+import { nextEvolve, synergyEffect } from '../../engine/run';
 import { sfx } from '../sfx';
 import { battleScreen } from './battle';
 
@@ -26,6 +27,7 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
 
   let selectedUid: string | null = null;
   let shop = ctx.offers;
+  let modal: HTMLElement | null = null;
 
   const render = () => {
     const board = boardUnits(run);
@@ -65,14 +67,13 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       <div class="prep__selected" id="selected"></div>
     `;
 
-    // 羁绊
+    // 羁绊（显示实际效果）
     const sy = document.getElementById('synergy')!;
-    if (resolved.synergies.length === 0) sy.innerHTML = '<span class="sy-empty">上阵精灵可触发羁绊</span>';
+    if (resolved.synergies.length === 0) sy.innerHTML = '<span class="sy-empty">上阵精灵可触发羁绊（点右上角有说明）</span>';
     else {
       sy.innerHTML = resolved.synergies.map((s) => `
-        <span class="sy ${s.tier > 0 ? 'on' : ''}">
-          ${s.cn} ${s.count}/${s.thresholds.map((t) => t).join('/')}
-          ${s.tier > 0 ? `<b>·${s.tier}层</b>` : ''}
+        <span class="sy on" title="${s.cn}：${s.effect}">
+          ${s.cn} ${s.count}/${s.thresholds.join('/')} · ${s.effect}
         </span>`).join('');
     }
 
@@ -115,9 +116,9 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       bn.appendChild(h);
     }
 
-    // 商店
+    // 商店：点卡片看详情，点金币按钮直接买（防误购）
     const sh = document.getElementById('shop')!;
-    sh.innerHTML = `<div class="shop-title">商店 · 攒利息</div>`;
+    sh.innerHTML = `<div class="shop-title">商店 · 攒利息 <button class="btn btn--tiny" id="shop-help">❔ 装备/羁绊说明</button></div>`;
     const row = document.createElement('div');
     row.className = 'shop-row';
     shop.forEach((id) => {
@@ -130,14 +131,17 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         <div class="shop-name">${spec.name}</div>
         <div class="shop-tags">${spec.tags.map((t) => `<span class="tag">${TYPE_CN[t] ?? t}</span>`).join('')}</div>
         <div class="shop-skill">${spec.skill.name}</div>
-        <button class="btn btn--small ${can ? 'btn--gold' : ''}" ${can ? '' : 'disabled'}>🪙 ${spec.cost}</button>`;
-      c.addEventListener('click', () => {
+        <button class="btn btn--small ${can ? 'btn--gold' : ''}" data-buy ${can ? '' : 'disabled'}>🪙 ${spec.cost} 买</button>`;
+      c.addEventListener('click', () => showInspect(id));
+      c.querySelector<HTMLElement>('[data-buy]')?.addEventListener('click', (e) => {
+        e.stopPropagation();
         if (buyUnit(run, id, ctx.rng) === null) { sfx.buy(); shop = rollShop(run, ctx.rng); render(); }
         else sfx.sell();
       });
       row.appendChild(c);
     });
     sh.appendChild(row);
+    sh.querySelector('#shop-help')?.addEventListener('click', () => showHelp());
 
     // 选中单位详情
     const sel = document.getElementById('selected')!;
@@ -147,13 +151,16 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
         const spec = speciesById(u.speciesId);
         const rb = resolveBoard(run, boardUnits(run));
         const stat = rb.units.find((x) => x.uid === u.uid);
+        const item = u.item ? itemById(u.item) : null;
+        const activeSyn = resolved.synergies.filter((s) => spec.tags.includes(s.tag)).map((s) => s.cn).join('、');
         sel.innerHTML = `
           <div class="sel-card">
             <img class="sel-img" src="img/${u.speciesId}.png">
             <div class="sel-info">
               <div class="sel-name">${spec.name} <span class="stars">${'★'.repeat(u.star)}${'☆'.repeat(3 - u.star)}</span></div>
-              <div class="sel-skill">技能：${spec.skill.name}</div>
-              <div class="sel-item">${u.item ? `装备：${itemById(u.item)?.name ?? ''}` : '装备：无'}</div>
+              <div class="sel-skill">技能：${spec.skill.name} — ${describeSkill(spec.skill)}</div>
+              <div class="sel-item">装备：${item ? `${item.name} — ${item.desc}` : '无'}</div>
+              ${activeSyn ? `<div class="sel-syn">羁绊：${activeSyn}</div>` : ''}
               ${stat ? `<div class="sel-stats">生命${stat.maxhp} 攻${stat.atk} 特攻${stat.spa} 防${stat.def} 速${stat.spe}</div>` : ''}
             </div>
             <div class="sel-actions">
@@ -196,7 +203,70 @@ export const prepScreen: ScreenMount = (app, ctx: GameCtx, router) => {
       </div>`;
   }
 
+  /* ---------- 详情弹窗 ---------- */
+  function closeModal() { modal?.remove(); modal = null; }
+
+  function showInspect(id: string) {
+    const spec = speciesById(id);
+    const evo = nextEvolve(id);
+    closeModal();
+    const m = document.createElement('div');
+    m.className = 'modal-layer';
+    m.innerHTML = `
+      <div class="inspect">
+        <button class="inspect-x" data-x>✕</button>
+        <img class="inspect-img" src="img/${id}.png">
+        <div class="inspect-name">${spec.name} <span class="stars">★☆☆</span></div>
+        <div class="inspect-tags">${spec.tags.map((t) => `<span class="tag">${TYPE_CN[t] ?? t}</span>`).join('')}</div>
+        <div class="inspect-stats">生命${spec.hp} · 攻击${spec.atk} · 特攻${spec.spa} · 防御${spec.def} · 速度${spec.spe}</div>
+        <div class="inspect-row"><b>技能</b> ${spec.skill.name}：${describeSkill(spec.skill)}</div>
+        <div class="inspect-row"><b>进化</b>${evo ? `：${evo}` : '：已是最终形态'}</div>
+        <div class="inspect-buy">
+          <button class="btn btn--gold" data-buy>🪙 ${spec.cost} 购买</button>
+          <button class="btn" data-x>关闭</button>
+        </div>
+      </div>`;
+    m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
+    m.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', closeModal));
+    m.querySelector('[data-buy]')?.addEventListener('click', () => {
+      if (buyUnit(run, id, ctx.rng) === null) { sfx.buy(); shop = rollShop(run, ctx.rng); closeModal(); render(); }
+    });
+    app.appendChild(m);
+    modal = m;
+  }
+
+  function showHelp() {
+    closeModal();
+    const m = document.createElement('div');
+    m.className = 'modal-layer';
+    const itemRows = ITEMS.map((i) => `<div class="help-row"><b>${i.icon} ${i.name}</b> — ${i.desc}</div>`).join('');
+    const synRows: string[] = [];
+    for (const [tag, cn] of Object.entries(TYPE_CN)) {
+      const thresholds = tag === 'bug' || tag === 'ice' || tag === 'psychic' || tag === 'poison' ? [2, 4] : [2, 4, 6];
+      const effects = thresholds.map((_, i) => synergyEffect(tag, i + 1)).filter(Boolean).join(' → ');
+      synRows.push(`<div class="help-row"><b>${cn}系</b>（${thresholds.join('/')}）${effects}</div>`);
+    }
+    for (const [tag, cn] of [['starter', '御三家'], ['money', '喵喵财团'], ['gamble', '伊布赌局'], ['tank', '巨兽'], ['legend', '传说']] as const) {
+      const thresholds = tag === 'legend' ? [2, 3] : tag === 'starter' ? [2, 3, 4] : [1, 2];
+      const effects = thresholds.map((_, i) => synergyEffect(tag, i + 1)).filter(Boolean).join(' → ');
+      synRows.push(`<div class="help-row"><b>${cn}</b>（${thresholds.join('/')}）${effects}</div>`);
+    }
+    m.innerHTML = `
+      <div class="inspect inspect--help">
+        <button class="inspect-x" data-x>✕</button>
+        <div class="help-title">装备</div>
+        ${itemRows}
+        <div class="help-title">羁绊（凑够数量生效）</div>
+        ${synRows.join('')}
+        <button class="btn" data-x style="margin-top:10px">关闭</button>
+      </div>`;
+    m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
+    m.querySelectorAll('[data-x]').forEach((b) => b.addEventListener('click', closeModal));
+    app.appendChild(m);
+    modal = m;
+  }
+
   render();
 
-  return () => { ctx.pendingMsg = []; };
+  return () => { closeModal(); ctx.pendingMsg = []; };
 };

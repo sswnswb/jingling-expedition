@@ -2,7 +2,7 @@
 
 import type { GameCtx, ScreenMount } from '../router';
 import { startBattle, stepSim, simulate, type BattleState, type BUnit, type SimEvent } from '../../engine/battle';
-import { resolveBoard, boardUnits, settleStage, TOTAL_STAGES } from '../../engine/run';
+import { resolveBoard, boardUnits, settleStage, rollShop, TOTAL_STAGES } from '../../engine/run';
 import { isBossStage, chapterOf, enemyPower } from '../../data/campaign';
 import { elemColor, unitImg } from '../art';
 import { prepScreen } from './prep';
@@ -373,6 +373,8 @@ export const battleScreen: ScreenMount = (app, ctx: GameCtx, router) => {
     overlay.style.display = 'flex';
     overlay.querySelector('#b-continue')?.addEventListener('click', () => {
       if (run.over) { router.show(endScreen); return; }
+      // 每局打完免费刷新一次商店（无需花金币）
+      ctx.offers = rollShop(run, ctx.rng);
       if (won) {
         run.stage++;
         // 每 3 关掉一个装备

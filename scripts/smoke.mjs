@@ -51,9 +51,9 @@ try {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(QA, '02-prep.png') });
 
-  // 买 2 张卡
-  const cards = page.locator('.shop-card');
-  for (let i = 0; i < 2; i++) { await cards.nth(0).click(); await page.waitForTimeout(120); }
+  // 买 2 张卡（点卡上的购买按钮；点卡本身是看详情）
+  const buy = page.locator('.shop-card [data-buy]');
+  for (let i = 0; i < 2; i++) { await buy.nth(0).click(); await page.waitForTimeout(120); }
 
   // 上阵：点备战席第一只 → 点棋盘第 1 格
   const bench = await page.$('.bench-slot');

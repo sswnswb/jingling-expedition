@@ -129,3 +129,23 @@ export function traitTier(count: number, thresholds: number[]): number {
   for (const th of thresholds) if (count >= th) tier++;
   return tier;
 }
+
+/** 技能效果 → 中文说明 */
+export function describeSkill(s: SkillDef): string {
+  const power = s.power ?? (['fighting', 'normal', 'ground', 'rock', 'bug'].includes(s.e) ? 'atk' : 'spa');
+  const stat = power === 'atk' ? '攻击' : '特攻';
+  const pct = Math.round(s.m * 100);
+  let head = '';
+  switch (s.t) {
+    case 'single': head = `对单体造成${stat}×${(s.m).toFixed(1).replace(/\.0$/, '')}伤害`; break;
+    case 'front': head = `对敌方前排造成${stat}×${(s.m).toFixed(1).replace(/\.0$/, '')}伤害`; break;
+    case 'aoe': head = `对全体敌人造成${stat}×${(s.m).toFixed(1).replace(/\.0$/, '')}伤害`; break;
+    case 'random': head = `对随机敌人造成${stat}×${(s.m).toFixed(1).replace(/\.0$/, '')}伤害`; break;
+    case 'heal_self': head = `恢复自身最大生命 ${pct}%`; break;
+    case 'heal_lowest': head = `治疗生命最低的队友最大生命 ${pct}%`; break;
+    default: head = '特殊技能';
+  }
+  if (s.cc) head += `，附带${s.cc === 'stun' ? '眩晕' : s.cc === 'sleep' ? '催眠' : '冰冻'}`;
+  if (s.e !== 'normal') head += `（${TYPE_CN[s.e] ?? s.e}系）`;
+  return head;
+}
