@@ -66,6 +66,7 @@ body {
 }
 .title__namebox input:focus { outline: none; border-color: var(--gold); }
 .title-tips { color: var(--ink-dim); font-size: 12px; line-height: 1.9; opacity: .85; }
+.title-ver { position: fixed; bottom: 8px; right: 12px; font-size: 11px; color: var(--ink-dim); opacity: .5; }
 
 /* ---- 备战屏 ---- */
 .prep {
