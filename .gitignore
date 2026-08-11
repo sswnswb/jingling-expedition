@@ -1,0 +1,7 @@
+node_modules/
+dist/
+qa/
+.DS_Store
+
+scripts/_*.js
+src/_dbg_test.ts
