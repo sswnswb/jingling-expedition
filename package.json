@@ -1,0 +1,21 @@
+{
+  "name": "jingling-expedition",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "validate": "node scripts/validate.mjs",
+    "fetch-art": "node scripts/fetch_art.mjs",
+    "deploy": "npm run build && gh-pages -d dist"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "gh-pages": "^6.3.0",
+    "playwright": "^1.49.0",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.0"
+  }
+}
